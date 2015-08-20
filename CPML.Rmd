@@ -1,0 +1,104 @@
+---
+date: "Thursday, August 06, 2015"
+output: html_document
+---
+
+## Course Project : Practical Machine Learning
+
+# Synopsis and Objective
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively.  One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, we will use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants who were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+
+The objective of this project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. The report will  describe how the model was built, how cross validation was applied, what the expected out of sample error is and why various choices were made.
+
+# Process Data
+
+```{r}
+fit_data <- read.csv("pml-training.csv", na.strings = c("NA", ""))
+summary(fit_data$classe)
+## Read test data that we will use later.
+test_fit_data <- read.csv("pml-training.csv", na.strings = c("NA", ""), header=TRUE)
+```
+The variable classe that we will be predicting on has 5 classes.
+We will now split the data into training and test sets, build and train the model on the training set and then test it on the test set.
+```{r}
+set.seed(0)
+library(caret)
+
+# Split 70/30 training and test data sets.
+
+trainset <- createDataPartition(y=fit_data$classe, p=0.7, list=FALSE)
+training <- fit_data[trainset,]
+testing <- fit_data[-trainset,]
+dim(training)
+```
+
+Lets clean the data sets
+
+```{r}
+na_test <- sapply(training, function(x) {sum(is.na(x))})
+table(na_test)
+# about 100 columns with missing values
+# remove the bad columns from the training data set
+bad_columns <- names(na_test[na_test==13460])
+training <- training[, !names(training) %in% bad_columns]
+str(training)
+# remove columns not connected to modeling
+training <- training[,-c(1:7)]
+
+# repeat the cleaning process for test data set too.
+na_test <- sapply(testing, function(x) {sum(is.na(x))})
+table(na_test)
+# about 100 columns with missing values
+# remove the bad columns from the training data set
+bad_columns <- names(na_test[na_test==13460])
+testing <- testing[, !names(testing) %in% bad_columns]
+str(testing)
+# remove columns not connected to modeling
+testing <- testing[,-c(1:7)]
+
+```
+
+# Build Models
+
+Use random forest on the training model
+
+```{r}
+library(randomForest)
+model <- train(classe~., method="rf", data=training)
+```
+
+# Evaluate/Cross Validate the model using the test data set
+
+```{r}
+prediction <- predict(model, testing)
+confusionMatrix(prediction, testing$classe)
+```
+
+Model is 99.34% accurate on the training data
+
+# Conclusion
+
+We have built a model to predict exercise form based on movement data. We estimate the out of sample error to be 0.0066 (1 - testing accuracy). This is a promising result regarding the use of machine learning to detect bad exercise form. It must be noted that what we are truly predicting is which of 5 predetermined supervised movements a subject is performing. So, although we estimate a very low out of sample error, we can expect the error of predicting bad form in real life situations to be higher.
+
+Finally, using the provided Test Set...
+
+```{r}
+prediction2 <- predict(model, test_fit_data)
+```
+
+Create files to submit
+
+```{r}
+pml_write_files = function(x){
+  n = length(x)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(prediction2)
+```
